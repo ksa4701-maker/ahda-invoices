@@ -96,10 +96,18 @@ async function decodeQr(source){
 
 // ---- ZATCA TLV ----
 function b64bytes(value){value=String(value||'').replace(/^\uFEFF/,'').trim();value=value.replace(/^zatca:\/\//i,'').replace(/^data:[^,]+,/i,'').replace(/^base64,/i,'');if((value.startsWith('"')&&value.endsWith('"'))||(value.startsWith("'")&&value.endsWith("'")))value=value.slice(1,-1);try{value=decodeURIComponent(value)}catch(error){}value=value.replace(/\s/g,'').replace(/-/g,'+').replace(/_/g,'/');if(!value||!/^[A-Za-z0-9+/]*={0,2}$/.test(value))throw new Error('Invalid Base64');while(value.length%4)value+='=';const binary=atob(value),output=new Uint8Array(binary.length);for(let index=0;index<binary.length;index++)output[index]=binary.charCodeAt(index);return output}
+// QR payload as bytes: Base64 (normal ZATCA), hex text, or raw binary TLV.
+function qrBytes(raw){
+  const s=String(raw||'');
+  if(s.charCodeAt(0)===1&&s.length>2){const out=new Uint8Array(s.length);for(let i=0;i<s.length;i++)out[i]=s.charCodeAt(i)&255;try{const u=new TextEncoder().encode(s);if(u.length!==s.length)return u}catch(e){}return out}
+  const hex=s.replace(/\s/g,'');if(/^01[0-9a-f]+$/i.test(hex)&&hex.length%2===0){const out=new Uint8Array(hex.length/2);for(let i=0;i<out.length;i++)out[i]=parseInt(hex.substr(i*2,2),16);return out}
+  return b64bytes(s)
+}
 function parseTlv(raw){
-  let bytes;try{bytes=b64bytes(raw)}catch{return null}
+  let bytes;try{bytes=qrBytes(raw)}catch{return null}
   const fields={};let index=0,guard=0;
-  const result=()=>fields[1]&&fields[2]&&fields[3]&&fields[4]&&fields[5]?fields:null;
+  // Accept any code that carries ZATCA tags 1-5 with at least the seller VAT number or the total.
+  const result=()=>{const n=[1,2,3,4,5].filter(k=>fields[k]).length;return n>=3&&(fields[2]||fields[4])?fields:null};
   while(index<bytes.length&&guard++<64){
     const tag=bytes[index++];if(index>=bytes.length)return result();
     const length=bytes[index++];
@@ -120,8 +128,27 @@ function qrDate(value){
 // Returns invoice fields from a ZATCA QR string, or null when it is not a ZATCA code.
 function zatcaFields(raw){
   const f=parseTlv(raw);if(!f)return null;
-  const total=num(f[4]),tax=num(f[5]);
-  return {name:f[1]||'',vatNo:(f[2]||'').replace(/\D/g,'')||f[2]||'',date:qrDate(f[3]),after:total,tax:tax,before:Math.round((total-tax)*100)/100,rawDate:f[3]}
+  const total=f[4]?num(f[4]):null,tax=f[5]?num(f[5]):null;
+  return {kind:'zatca',name:f[1]||'',vatNo:(f[2]||'').replace(/\D/g,'')||f[2]||'',date:f[3]?qrDate(f[3]):'',after:total,tax:tax,before:total!==null&&tax!==null?Math.round((total-tax)*100)/100:null,rawDate:f[3]||''}
+}
+// Any QR code: ZATCA values are exact; other codes (text, JSON, links) give whatever they contain,
+// and the rest of the invoice is then read from the picture.
+function qrFields(raw){
+  const z=zatcaFields(raw);if(z)return z;
+  let text=String(raw||'').trim();const out={kind:'other',raw:text,name:'',vatNo:'',date:'',after:null,tax:null,before:null,invNo:'',rawDate:''};
+  try{const j=JSON.parse(text);if(j&&typeof j==='object')text=Object.entries(j).map(([k,v])=>`${k}: ${v}`).join('\n')}catch(e){}
+  if(/^https?:\/\//i.test(text)){try{const u=new URL(text);text=[...u.searchParams].map(([k,v])=>`${k}: ${v}`).join('\n');out.kind='link'}catch(e){}}
+  if(text){const f=extractInvoiceFields(text);
+    out.vatNo=f.vatNo||'';out.invNo=f.invNo||'';out.date=f.date||'';out.after=f.after;out.tax=f.tax;out.before=f.before;
+    const kv=k=>{const m=text.match(new RegExp('(?:^|[\\n&;])\\s*(?:'+k+')\\s*[:=]\\s*([^\\n&;]+)','i'));return m?m[1].trim():''};
+    out.invNo=out.invNo||kv('invoice_?(?:no|number|id)|inv(?:no)?|bill_?no|receipt_?no|رقم الفاتورة');
+    out.vatNo=out.vatNo||(kv('vat_?(?:no|number)|tax_?(?:no|number)|trn|الرقم الضريبي').replace(/\D/g,''));
+    out.name=kv('seller|seller_?name|company|merchant|supplier|اسم البائع|البائع');
+    const tot=kv('total|amount|grand_?total|الإجمالي|الاجمالي');if(out.after===null&&tot)out.after=num(tot);
+    const vt=kv('vat|tax|vat_?amount|الضريبة');if(out.tax===null&&vt&&!/^\d{15}$/.test(vt.replace(/\D/g,'')))out.tax=num(vt);
+    if(out.after!==null&&out.tax!==null&&out.before===null)out.before=Math.round((out.after-out.tax)*100)/100;
+  }
+  return out
 }
 
 // ---- OCR ----
@@ -181,7 +208,30 @@ function findVatNumber(lines){
   for(let index=0;index<lines.length;index++)if(label.test(lines[index])){collect(lines[index],true);if(lines[index+1])collect(lines[index+1],true)}
   return candidates.find(value=>value.startsWith('3')&&value.endsWith('3'))||''
 }
+// Labels that introduce an invoice / receipt number on Saudi receipts (English and Arabic).
+const INV_LABEL=/(?:(?:simplified\s*)?(?:tax\s*)?invoice\s*(?:no\.?|number|num\.?|#|id|ref(?:erence)?)|\binv\.?\s*(?:no\.?|#|number)|\bbill\s*(?:no\.?|#|number)|receipt\s*(?:no\.?|#|number)|\b(?:trans(?:action)?|txn|trx)\s*(?:no\.?|#|number|id)|\border\s*(?:no\.?|#|number)|\bdoc(?:ument)?\s*(?:no\.?|#)|\bserial\s*(?:no\.?|#)|رقم\s*(?:ال)?فاتور[ةه]|فاتور[ةه]\s*رقم|رقم\s*(?:ال)?(?:إيصال|ايصال|سند|طلب|عملية|العملية|مستند|المستند|مرجع|المرجع)|الرقم\s*التسلسلي|رقم\s*تسلسلي)/i;
+function invoiceToken(text){
+  const tokens=normalizeOcrText(text).replace(INV_LABEL,' ').match(/[A-Z]{0,8}[-\/#]?\d[\dA-Z\-\/]{1,30}/gi)||[];
+  for(let tok of tokens){
+    tok=tok.replace(/^[#\-\/]+|[.,:\-\/]+$/g,'');const digits=tok.replace(/\D/g,'');
+    if(digits.length<2||digits.length>20)continue;
+    if(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(tok)||/^20\d{2}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(tok))continue; // date
+    if(/^3\d{13}3$/.test(digits))continue; // VAT number
+    if(/^(?:05|9665)\d{8}$/.test(digits))continue; // mobile number
+    if(/^\d{1,2}:\d{2}/.test(tok))continue; // time
+    return tok
+  }
+  return ''
+}
 function findInvoiceNumber(lines){
+  for(let i=0;i<lines.length;i++){
+    if(!INV_LABEL.test(lines[i]))continue;
+    const same=invoiceToken(lines[i]);if(same)return same;
+    for(const off of [1,-1,2]){const near=lines[i+off];if(near&&!INV_LABEL.test(near)&&!/(?:date|تاريخ|vat|tax\s*no|ضريبي)/i.test(near)){const tok=invoiceToken(near);if(tok)return tok}}
+  }
+  return findInvoiceNumberLegacy(lines)
+}
+function findInvoiceNumberLegacy(lines){
   const patterns=[/(?:tax\s*)?invoice\s*(?:no\.?|number|#|ref(?:erence)?\.?)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\/._-]{1,40})/i,/(?:inv|bill|receipt|document)\s*(?:no\.?|number|#)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\/._-]{1,40})/i,/(?:رقم\s*(?:الفاتورة|المستند|الإيصال|الايصال)|فاتورة\s*رقم)\s*[:#-]?\s*([A-Z0-9][A-Z0-9\/._-]{1,40})/i];
   for(const line of lines)for(const pattern of patterns){const match=line.match(pattern);if(match&&!/^(?:no|number|invoice|فاتورة)$/i.test(match[1]))return match[1].replace(/[.,:]+$/,'')}
   const cashIndex=lines.findIndex(line=>/(?:cash\s*invoice|فاتورة\s*نقدية)/i.test(line));if(cashIndex>=0){for(let distance=1;distance<=6;distance++)for(const index of [cashIndex-distance,cashIndex+distance]){const line=lines[index]||'';if(/(?:date|mob|mobile|tel|c\.?r\.?|س\.?\s*ت|جوال)/i.test(line))continue;const match=line.match(/^\D*(\d{3,8})\D*$/);if(match&&!/^20\d{2}$/.test(match[1]))return match[1]}}
@@ -246,14 +296,22 @@ async function readPhoto(file,progress){
   ocrLogger=m=>{if(m?.status==='recognizing text'&&progress)progress(Math.round((m.progress||0)*100))};
   const image=await imageFromFile(file),prepared=autoCropDocument(image);
   let qr=null;
-  try{const raw=await decodeQr(fitCanvas(prepared,3000));if(raw)qr=zatcaFields(raw)}catch(e){}
+  try{const raw=await decodeQr(fitCanvas(prepared,3000));if(raw)qr=qrFields(raw)}catch(e){}
   let text='';
   try{text=await readInvoiceOcr(prepared,'fast');let f=extractInvoiceFields(text);
-    if(!qr&&(!f.date||f.after===null||!f.invNo)){text=mergeOcrText(text,await readInvoiceOcr(prepared,'deep'))}
+    if(qr?.kind!=='zatca'&&(!f.date||f.after===null||!f.invNo||!f.name||!f.desc)||(qr&&!f.invNo)){text=mergeOcrText(text,await readInvoiceOcr(prepared,'deep'))}
   }catch(e){console.error(e)}
   const ocr=text?extractInvoiceFields(text):null;
   return {qr,ocr,text}
 }
 
-window.Scan={tryDecode,decodeQr,enhanceCanvas,fixedThresholdCanvas,zxingWasmDecode,zatcaFields,parseTlv,readPhoto,extractInvoiceFields,imageFromFile,canvasFromImage};
+// OCR only (used after a live QR scan, which never carries the invoice number).
+async function readText(source,progress){
+  ocrLogger=m=>{if(m?.status==='recognizing text'&&progress)progress(Math.round((m.progress||0)*100))};
+  const prepared=autoCropDocument(source);let text=await readInvoiceOcr(prepared,'fast');
+  if(!extractInvoiceFields(text).invNo)text=mergeOcrText(text,await readInvoiceOcr(prepared,'deep'));
+  return {ocr:extractInvoiceFields(text),text}
+}
+
+window.Scan={qrFields,readText,findInvoiceNumber,tryDecode,decodeQr,enhanceCanvas,fixedThresholdCanvas,zxingWasmDecode,zatcaFields,parseTlv,readPhoto,extractInvoiceFields,imageFromFile,canvasFromImage};
 })();

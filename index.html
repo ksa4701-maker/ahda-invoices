@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ur" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="عهدة">
-<title>عهدة فواتير</title>
+<meta name="apple-mobile-web-app-title" content="Custody">
+<title>Custody Invoices</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -22,6 +22,7 @@ header.top{position:sticky;top:0;z-index:5;background:var(--hd);color:#fff;paddi
 header.top h1{font-size:17px;font-weight:600;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .icon-btn{background:transparent;border:0;color:inherit;font-size:20px;padding:6px 8px;border-radius:8px;cursor:pointer;line-height:1}
 .icon-btn:active{background:rgba(255,255,255,.15)}
+.lang-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:4px 10px;font-size:14px;cursor:pointer}
 main{padding:12px 12px 120px;max-width:720px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:500}
@@ -30,7 +31,10 @@ main{padding:12px 12px 120px;max-width:720px;margin:0 auto}
 .btn.danger{color:var(--bad);border-color:#f0c4c4}
 .btn.block{display:flex;width:100%}
 .row{display:flex;gap:8px;align-items:center}
-.row>*{flex:1}
+.row>*{flex:1;min-width:0}
+.acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+.acts .btn{padding:8px 4px;font-size:14px}
+#savedList .t{overflow-wrap:anywhere}
 .muted{color:var(--mut);font-size:13px}
 .rep{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
 .rep input[type=checkbox]{width:22px;height:22px;margin-top:2px;flex:none}
@@ -45,7 +49,7 @@ main{padding:12px 12px 120px;max-width:720px;margin:0 auto}
 .item .n{width:26px;height:26px;border-radius:50%;background:#eef1f6;display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}
 .item .m{flex:1;min-width:0}
 .item .m div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item .a{font-weight:600;direction:ltr;text-align:left}
+.item .a{font-weight:600;direction:ltr}
 .item.hl .m .d{background:#ffff00}
 .flag{font-size:11px;padding:1px 6px;border-radius:6px;background:#fff3e0;color:var(--warn);margin-inline-start:4px}
 .dock{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:8px 8px calc(env(safe-area-inset-bottom) + 8px);display:grid;grid-template-columns:repeat(4,1fr);gap:6px;z-index:6}
@@ -55,14 +59,16 @@ main{padding:12px 12px 120px;max-width:720px;margin:0 auto}
 .sheet{position:fixed;inset:0;background:var(--bg);z-index:20;overflow:auto}
 .sheet main{padding-bottom:40px}
 label.f{display:block;margin-bottom:10px}
-label.f>span{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);margin-bottom:4px}
+label.f>span{display:flex;justify-content:space-between;gap:6px;font-size:13px;color:var(--mut);margin-bottom:4px}
 label.f input,label.f select,label.f textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;font-size:16px}
 label.f textarea{min-height:64px;resize:vertical}
 label.f.unsure input,label.f.unsure textarea{border-color:#f0a020;background:#fffaf0}
 label.f.sure input{border-color:#9cd3a0;background:#f4fbf4}
-.tag{font-size:11px;border-radius:6px;padding:0 6px}
+.ar{font-size:12px;opacity:.85}
+.tag{font-size:11px;border-radius:6px;padding:0 6px;font-style:normal}
 .tag.ok{background:#e6f4e7;color:var(--ok)}.tag.warn{background:#fff3e0;color:var(--warn)}
-input.num{direction:ltr;text-align:left}
+input.num{direction:ltr}
+[dir=rtl] input.num{text-align:right}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .chk{display:flex;align-items:center;gap:8px;padding:8px 0}
 .chk input{width:22px;height:22px}
@@ -76,6 +82,7 @@ input.num{direction:ltr;text-align:left}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;z-index:50;max-width:90vw;text-align:center;font-size:14px}
 #busy{position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-weight:500;text-align:center;padding:20px}
 .spin{width:38px;height:38px;border:4px solid #cfd6e2;border-top-color:var(--hd);border-radius:50%;animation:s 1s linear infinite}
+.spin.sm{width:16px;height:16px;border-width:2px;display:inline-block;vertical-align:-3px;margin-inline-end:6px}
 @keyframes s{to{transform:rotate(360deg)}}
 #pdfPages img{width:100%;border:1px solid var(--line);margin-bottom:8px;background:#fff}
 .empty{text-align:center;color:var(--mut);padding:30px 10px}
@@ -100,36 +107,37 @@ input.num{direction:ltr;text-align:left}
 
 <!-- Home: list of custody reports -->
 <section id="home">
-  <header class="top"><h1>عہدے اور رسیدیں</h1><button class="icon-btn" id="menuBtn" aria-label="ترتیبات">⚙</button></header>
+  <header class="top"><h1 data-i18n="homeTitle"></h1><button class="lang-btn" id="langBtn"></button><button class="icon-btn" id="menuBtn" data-i18n-aria="settings">⚙</button></header>
   <main>
     <div id="repList"></div>
-    <button class="btn primary block" id="newRepBtn">+ نیا عہدہ</button>
-    <p class="muted" style="margin-top:14px">جن عہدوں پر ✓ لگا ہو وہ ایک ہی PDF میں ترتیب سے آئیں گے۔</p>
+    <button class="btn primary block" id="newRepBtn" data-i18n="newRep"></button>
+    <p class="muted" style="margin-top:14px" data-i18n="homeHint"></p>
   </main>
-  <div class="dock" style="grid-template-columns:1fr 1fr">
-    <button id="homePdfBtn" class="main"><i>⎙</i>منتخب عہدوں کی PDF</button>
-    <button id="backupBtn"><i>⇩</i>بیک اپ</button>
+  <div class="dock" style="grid-template-columns:1.4fr 1fr 1fr">
+    <button id="homePdfBtn" class="main"><i>⎙</i><span data-i18n="homePdf"></span></button>
+    <button id="savedBtn"><i>🗂</i><span data-i18n="savedFiles"></span></button>
+    <button id="backupBtn"><i>⇩</i><span data-i18n="backup"></span></button>
   </div>
 </section>
 
 <!-- One custody report -->
 <section id="report" class="hidden">
-  <header class="top"><button class="icon-btn" id="backBtn" aria-label="واپس">→</button><h1 id="repTitle"></h1><button class="icon-btn" id="repEditBtn" aria-label="عہدہ ایڈٹ">✎</button></header>
+  <header class="top"><button class="icon-btn" id="backBtn" data-i18n="backArrow" data-i18n-aria="back"></button><h1 id="repTitle"></h1><button class="icon-btn" id="repEditBtn" data-i18n-aria="editCustody">✎</button></header>
   <main>
     <div class="card">
       <div class="nums">
-        <div><span>العهده</span><b id="sCustody"></b></div>
-        <div><span>تنزيل العهده</span><b id="sSpent"></b></div>
-        <div><span>المتبقي</span><b id="sLeft"></b></div>
+        <div><span data-i18n="custody"></span><b id="sCustody"></b></div>
+        <div><span data-i18n="spent"></span><b id="sSpent"></b></div>
+        <div><span data-i18n="left"></span><b id="sLeft"></b></div>
       </div>
       <div class="muted" style="margin-top:8px" id="sCount"></div>
     </div>
     <div class="card" id="itemList"></div>
   </main>
   <div class="dock">
-    <button id="scanBtn" class="main"><i>▣</i>QR اسکین</button>
-    <button id="photoBtn"><i>📷</i>رسید کی تصویر</button>
-    <button id="manualBtn"><i>✎</i>ہاتھ سے</button>
+    <button id="scanBtn" class="main"><i>▣</i><span data-i18n="scanQr"></span></button>
+    <button id="photoBtn"><i>📷</i><span data-i18n="photo"></span></button>
+    <button id="manualBtn"><i>✎</i><span data-i18n="manual"></span></button>
     <button id="repPdfBtn"><i>⎙</i>PDF</button>
   </div>
   <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden">
@@ -137,45 +145,45 @@ input.num{direction:ltr;text-align:left}
 
 <!-- Report settings -->
 <section id="repSheet" class="sheet hidden">
-  <header class="top"><button class="icon-btn" data-close aria-label="بند">✕</button><h1>عہدے کی تفصیل</h1></header>
+  <header class="top"><button class="icon-btn" data-close data-i18n-aria="close">✕</button><h1 data-i18n="custodyDetails"></h1></header>
   <main>
-    <label class="f"><span>عنوان (PDF میں اوپر)</span><input id="rTitle" placeholder="عهدة محمد نور .  ( مشروع مدارس المتقدمه  الجبيل - شركه مسماك )"></label>
-    <label class="f"><span>العهده (ملی ہوئی رقم)</span><input id="rCustody" class="num" inputmode="decimal" placeholder="10000.00"></label>
-    <label class="f"><span>قسم (نیلی پٹی)</span><input id="rCat" placeholder="مستلزمات تشغيل"></label>
-    <button class="btn primary block" id="rSave">محفوظ کریں</button>
+    <label class="f"><span data-i18n="rTitle"></span><input id="rTitle" dir="rtl" placeholder="عهدة محمد نور .  ( مشروع مدارس المتقدمه  الجبيل - شركه مسماك )"></label>
+    <label class="f"><span data-i18n="rCustody"></span><input id="rCustody" class="num" inputmode="decimal" placeholder="10000.00"></label>
+    <label class="f"><span data-i18n="rCat"></span><input id="rCat" dir="rtl" placeholder="مستلزمات تشغيل"></label>
+    <button class="btn primary block" id="rSave" data-i18n="save"></button>
     <div style="height:24px"></div>
-    <button class="btn block" id="rUp">اوپر لے جائیں</button>
+    <button class="btn block" id="rUp" data-i18n="moveUp"></button>
     <div style="height:8px"></div>
-    <button class="btn danger block" id="rDelete">یہ عہدہ ڈیلیٹ کریں</button>
+    <button class="btn danger block" id="rDelete" data-i18n="deleteCustody"></button>
   </main>
 </section>
 
 <!-- Invoice form -->
 <section id="formSheet" class="sheet hidden">
-  <header class="top"><button class="icon-btn" data-close aria-label="بند">✕</button><h1 id="fHead">رسید</h1></header>
-  <main>
+  <header class="top"><button class="icon-btn" data-close data-i18n-aria="close">✕</button><h1 id="fHead"></h1></header>
+  <main dir="rtl">
     <div id="fStatus" class="status hidden"></div>
     <img id="fPreview" class="hidden" style="width:100%;max-height:220px;object-fit:contain;border-radius:10px;background:#fff;margin-bottom:10px" alt="">
-    <label class="f" data-k="date"><span>التاريخ <em></em></span><input id="fDate" type="date"></label>
-    <label class="f" data-k="invNo"><span>رقم الفاتورة <em></em></span><input id="fInvNo" class="num" inputmode="text" placeholder="0"></label>
-    <label class="f" data-k="name"><span>الاسم <em></em></span><input id="fName"></label>
-    <label class="f" data-k="desc"><span>بيان <em></em></span><textarea id="fDesc"></textarea></label>
-    <label class="f" data-k="vatNo"><span>الرقم الضريبي <em></em></span><input id="fVatNo" class="num" inputmode="numeric" placeholder="0"></label>
+    <label class="f" data-k="date"><span><b data-i18n="fDate"></b><em></em></span><input id="fDate" type="date"></label>
+    <label class="f" data-k="invNo"><span><b data-i18n="fInvNo"></b><em></em></span><input id="fInvNo" class="num" inputmode="text" placeholder="0"></label>
+    <label class="f" data-k="name"><span><b data-i18n="fName"></b><em></em></span><input id="fName" dir="auto"></label>
+    <label class="f" data-k="desc"><span><b data-i18n="fDesc"></b><em></em></span><textarea id="fDesc" dir="auto"></textarea></label>
+    <label class="f" data-k="vatNo"><span><b data-i18n="fVatNo"></b><em></em></span><input id="fVatNo" class="num" inputmode="numeric" placeholder="0"></label>
     <div class="grid2">
-      <label class="f" data-k="after"><span>الاجمالي بعد الضريبة <em></em></span><input id="fAfter" class="num" inputmode="decimal"></label>
-      <label class="f"><span>النسبة</span><select id="fRate"><option value="15">15%</option><option value="0">0%</option></select></label>
-      <label class="f" data-k="before"><span>الاجمالي قبل الضريبة <em></em></span><input id="fBefore" class="num" inputmode="decimal"></label>
-      <label class="f" data-k="tax"><span>الضريبة <em></em></span><input id="fTax" class="num" inputmode="decimal"></label>
+      <label class="f" data-k="after"><span><b data-i18n="fAfter"></b><em></em></span><input id="fAfter" class="num" inputmode="decimal"></label>
+      <label class="f"><span><b data-i18n="fRate"></b></span><select id="fRate"><option value="15">15%</option><option value="0">0%</option></select></label>
+      <label class="f" data-k="before"><span><b data-i18n="fBefore"></b><em></em></span><input id="fBefore" class="num" inputmode="decimal"></label>
+      <label class="f" data-k="tax"><span><b data-i18n="fTax"></b><em></em></span><input id="fTax" class="num" inputmode="decimal"></label>
     </div>
     <div id="fCheck" class="muted" style="margin:-4px 0 8px"></div>
-    <label class="chk"><input type="checkbox" id="fHl"> بيان پر پیلا نشان</label>
-    <label class="f"><span>نمبر (ترتیب)</span><input id="fPos" type="number" inputmode="numeric" min="1" class="num"></label>
-    <button class="btn primary block" id="fSave">محفوظ کریں</button>
+    <label class="chk"><input type="checkbox" id="fHl"> <span data-i18n="fHl"></span></label>
+    <label class="f"><span><b data-i18n="fPos"></b></span><input id="fPos" type="number" inputmode="numeric" min="1" class="num"></label>
+    <button class="btn primary block" id="fSave" data-i18n="save"></button>
     <div style="height:8px"></div>
-    <button class="btn block" id="fSaveNext">محفوظ کریں اور اگلی اسکین</button>
+    <button class="btn block" id="fSaveNext" data-i18n="saveNext"></button>
     <div style="height:20px"></div>
-    <button class="btn danger block hidden" id="fDelete">یہ رسید ڈیلیٹ کریں</button>
-    <details style="margin-top:14px" id="fOcrWrap" class="hidden"><summary class="muted">تصویر سے پڑھا گیا متن</summary><pre id="fOcr" style="white-space:pre-wrap;font-size:12px;direction:ltr"></pre></details>
+    <button class="btn danger block hidden" id="fDelete" data-i18n="deleteInvoice"></button>
+    <details style="margin-top:14px" id="fOcrWrap" class="hidden"><summary class="muted" data-i18n="ocrText"></summary><pre id="fOcr" style="white-space:pre-wrap;font-size:12px;direction:ltr"></pre></details>
   </main>
 </section>
 
@@ -183,40 +191,55 @@ input.num{direction:ltr;text-align:left}
 <section id="scanner" class="hidden">
   <video id="video" playsinline muted autoplay></video>
   <div class="frame"></div>
-  <div class="msg" id="scanMsg">رسید کا QR سبز چوکور میں لائیں</div>
+  <div class="msg" id="scanMsg"></div>
   <div class="bar">
-    <button class="btn hidden" id="torchBtn">🔦 لائٹ</button>
-    <button class="btn" id="scanPhotoBtn">📷 تصویر سے پڑھیں</button>
-    <button class="btn" id="scanManualBtn">✎ بغیر QR</button>
-    <button class="btn" id="scanClose">✕ بند</button>
+    <button class="btn hidden" id="torchBtn">🔦 <span data-i18n="torch"></span></button>
+    <button class="btn" id="scanPhotoBtn">📷 <span data-i18n="readPhoto"></span></button>
+    <button class="btn" id="scanManualBtn">✎ <span data-i18n="noQr"></span></button>
+    <button class="btn" id="scanClose">✕ <span data-i18n="close"></span></button>
   </div>
 </section>
 
 <!-- PDF result -->
 <section id="pdfSheet" class="sheet hidden">
-  <header class="top"><button class="icon-btn" data-close aria-label="بند">✕</button><h1>PDF تیار ہے</h1></header>
+  <header class="top"><button class="icon-btn" data-close data-i18n-aria="close">✕</button><h1 data-i18n="pdfReady"></h1></header>
   <main>
+    <p class="muted" data-i18n="savedNote"></p>
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn primary" id="pdfShare" data-i18n="sharePdf"></button>
+      <button class="btn primary" id="docxShare" data-i18n="shareWord"></button>
+    </div>
     <div class="row" style="margin-bottom:10px">
-      <button class="btn primary" id="pdfShare">شیئر / WhatsApp</button>
-      <button class="btn" id="pdfSave">فائل محفوظ</button>
+      <button class="btn" id="pdfSave" data-i18n="savePdf"></button>
+      <button class="btn" id="docxSave" data-i18n="saveWord"></button>
     </div>
     <div id="pdfPages"></div>
   </main>
 </section>
 
+<!-- Saved files -->
+<section id="savedSheet" class="sheet hidden">
+  <header class="top"><button class="icon-btn" data-close data-i18n-aria="close">✕</button><h1 data-i18n="savedFiles"></h1></header>
+  <main><div id="savedList"></div></main>
+</section>
+
 <!-- Settings / backup -->
 <section id="setSheet" class="sheet hidden">
-  <header class="top"><button class="icon-btn" data-close aria-label="بند">✕</button><h1>بیک اپ اور ترتیبات</h1></header>
+  <header class="top"><button class="icon-btn" data-close data-i18n-aria="close">✕</button><h1 data-i18n="settingsTitle"></h1></header>
   <main>
     <div class="card">
-      <b>بیک اپ</b>
-      <p class="muted">سارا ڈیٹا اسی فون میں محفوظ ہے۔ ہفتے میں ایک بار بیک اپ فائل بنا کر WhatsApp یا Drive میں رکھ لیں۔ فون بدلیں تو "بیک اپ واپس لائیں" سے سب آ جائے گا۔</p>
-      <button class="btn block" id="exportBtn">بیک اپ فائل بنائیں</button><div style="height:8px"></div>
-      <button class="btn block" id="importBtn">بیک اپ واپس لائیں</button>
+      <b data-i18n="language"></b>
+      <label class="f" style="margin-top:8px"><select id="langSel"><option value="en">English</option><option value="ar">العربية</option></select></label>
+    </div>
+    <div class="card">
+      <b data-i18n="backup"></b>
+      <p class="muted" data-i18n="backupHelp"></p>
+      <button class="btn block" id="exportBtn" data-i18n="exportBtn"></button><div style="height:8px"></div>
+      <button class="btn block" id="importBtn" data-i18n="importBtn"></button>
       <input type="file" id="importInput" accept=".json,application/json" class="hidden">
     </div>
     <div class="card">
-      <b>تاریخ کا انداز (PDF میں)</b>
+      <b data-i18n="dateFmt"></b>
       <label class="f" style="margin-top:8px"><select id="dateFmt"><option value="d-m-yyyy">30-6-2026</option><option value="d/m/yyyy">30/6/2026</option><option value="dd/mm/yyyy">30/06/2026</option></select></label>
     </div>
     <p class="muted" id="verTxt"></p>
@@ -231,6 +254,8 @@ input.num{direction:ltr;text-align:left}
 <script src="vendor/js/zxing-0.21.3.min.js"></script>
 <script src="vendor/qrwasm/zxing-reader-3.1.2.js"></script>
 <script src="scan.js"></script>
+<script src="i18n.js"></script>
+<script src="docx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
