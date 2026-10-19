@@ -1,6 +1,8 @@
 // App interface texts. The PDF itself always stays in the Arabic custody format.
 window.I18N={
 en:{
+  pageOf:'Invoice {n} of {m}',readingPage:'Reading PDF page {n} of {m}…',
+  mismatch:'⚠ The QR says {q} but the invoice shows {p} – check which amount is right.',mismatchUsedPrinted:'⚠ The QR says {q} but the invoice shows {p} – the printed amount was used.',
   savedFiles:'Saved files',noSaved:'No saved files yet. Every PDF / Word you make is kept here.',edit:'Edit',rebuild:'Rebuild',delete:'Delete',
   editHint:'Fix the invoices, then open Saved files and tap “Rebuild” on this file.',rebuildAsk:'Rebuild this PDF and Word from the current invoices?',delFileAsk:'Delete the saved file “{n}”? (The custody invoices stay.)',fileSaved:'PDF and Word saved in “Saved files”',
   savedNote:'Saved automatically in “Saved files” – you can edit and rebuild it later.',sharePdf:'Share PDF',shareWord:'Share Word',savePdf:'Save PDF',saveWord:'Save Word',
@@ -33,6 +35,8 @@ en:{
   restoreAsk:'The backup has {r} custodies and {n} invoices. Replace the data on this phone?',restored:'Backup restored ✓',badBackup:'This is not a valid backup file',saveFail:'Data could not be saved: '
 },
 ar:{
+  pageOf:'الفاتورة {n} من {m}',readingPage:'جاري قراءة صفحة PDF {n} من {m}…',
+  mismatch:'⚠ رمز QR يذكر {q} والفاتورة تذكر {p} – تحقق من المبلغ الصحيح.',mismatchUsedPrinted:'⚠ رمز QR يذكر {q} والفاتورة تذكر {p} – تم استخدام المبلغ المطبوع.',
   savedFiles:'الملفات المحفوظة',noSaved:'لا توجد ملفات محفوظة بعد. كل ملف PDF / Word تنشئه يُحفظ هنا.',edit:'تعديل',rebuild:'إعادة إنشاء',delete:'حذف',
   editHint:'صحّح الفواتير ثم افتح «الملفات المحفوظة» واضغط «إعادة إنشاء» على هذا الملف.',rebuildAsk:'إعادة إنشاء ملف PDF و Word من الفواتير الحالية؟',delFileAsk:'حذف الملف المحفوظ «{n}»؟ (فواتير العهدة تبقى.)',fileSaved:'تم حفظ PDF و Word في «الملفات المحفوظة»',
   savedNote:'يُحفظ تلقائياً في «الملفات المحفوظة» – يمكنك تعديله وإعادة إنشائه لاحقاً.',sharePdf:'مشاركة PDF',shareWord:'مشاركة Word',savePdf:'حفظ PDF',saveWord:'حفظ Word',

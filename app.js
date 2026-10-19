@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const VERSION='1.2.0';
+const VERSION='1.3.0';
 const KEY='ahda_state_v1';
 const $=id=>document.getElementById(id);
 const base=new URL('.',location.href).href;
@@ -11,7 +11,8 @@ try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&Array.isArray(s.
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){alert(t('saveFail')+e.message)}}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-let curRep=null,editItem=null,formSource='manual',formToken=0,qrTime='';
+let curRep=null,editItem=null,formSource='manual',formToken=0,qrTime='',autoName='';
+Scan.setIgnoreNames(state.settings.ignoreNames);
 
 // ---------- language ----------
 let lang=state.settings.lang||(/^ar/i.test(navigator.language||'')?'ar':'en');
@@ -131,6 +132,8 @@ function saveForm(next){
   if(!(v.after>0)){alert(t('needTotal'));$('fAfter').focus();return}
   if(Math.abs(r2(v.before+v.tax)-v.after)>0.006&&!confirm(t('confirmSum')))return;
   v.qrTime=editItem?(editItem.qrTime||''):qrTime;
+  // The photo picked a wrong name and the user corrected it: never pick that name again.
+  if(!editItem&&autoName&&v.name&&v.name!==autoName){const l=state.settings.ignoreNames||(state.settings.ignoreNames=[]);if(!l.includes(autoName))l.unshift(autoName);l.length=Math.min(l.length,30);Scan.setIgnoreNames(l)}
   const dup=findDuplicate(v,editItem);
   if(dup){const n=dup.rep.items.indexOf(dup.it)+1;alert(t('dupBlocked',{d:`${dup.it.name} · ${dup.it.invNo||'0'} · ${fmtDate(dup.it.date)} · ${money(dup.it.after)}`,r:dup.rep.title||t('untitled'),n}));return}
   const rep=curRep;let item=editItem;
@@ -138,7 +141,8 @@ function saveForm(next){
   let pos=parseInt($('fPos').value,10);if(!(pos>=1))pos=rep.items.length+1;pos=Math.min(pos,rep.items.length+1);
   rep.items.splice(pos-1,0,item);
   save();hide('formSheet');resetForm();renderReport();toast(t('invSaved'));
-  if(next)startScanner();
+  if(readQueue.length)openNextRead();
+  else if(next)startScanner();
 }
 $('fSave').addEventListener('click',()=>saveForm(false));
 $('fSaveNext').addEventListener('click',()=>saveForm(true));
@@ -148,7 +152,17 @@ $('fDelete').addEventListener('click',()=>{if(!editItem||!confirm(t('confirmDelI
 function memoryFor(vatNo){if(!vatNo||vatNo==='0')return null;let best=null;for(const rep of state.reports)for(const it of rep.items)if(it.vatNo===vatNo&&(!best||(it.added||0)>(best.added||0)))best=it;return best}
 
 // Build the form from a QR and/or OCR result. QR values are exact; OCR values are marked for checking.
-function openFromRead(qr,ocr,photoUrl,ocrText){
+// Compare the QR amounts with the amounts printed on the invoice. Some sellers' QR codes carry
+// rounding errors (e.g. QR 33.99 while the invoice says 34.00).
+function amountMismatch(qr,ocr){
+  if(!qr||qr.kind!=='zatca'||!ocr||ocr.after===null||qr.after===null)return null;
+  const d=Math.abs(ocr.after-qr.after);return d>=0.005&&d<Math.max(5,qr.after*0.05)?{qr:qr.after,printed:ocr.after}:null;
+}
+function openFromRead(qr,ocr,photoUrl,ocrText,exactText){
+  // Only a digital PDF's printed text is reliable enough to overrule the QR; a photo's OCR can misread digits.
+  const mm=exactText?amountMismatch(qr,ocr):null;
+  if(mm){const after=r2(ocr.after),before=r2(ocr.before!==null?ocr.before:ocr.tax!==null?after-ocr.tax:after/1.15);qr=Object.assign({},qr,{after,before,tax:r2(after-before)})}
+  if(ocr&&!exactText&&ocr.desc)ocr=Object.assign({},ocr,{desc:ocr.desc.split(' | ')[0].slice(0,80)});
   const v={date:'',invNo:'',name:'',desc:'',vatNo:'',after:null,before:null,tax:null,rate:15};const flags={};
   if(qr){const exact=qr.kind==='zatca';
     for(const k of ['name','vatNo','date','after','tax','before','invNo']){const val=qr[k];if(val===null||val===undefined||val==='')continue;v[k]=val;flags[k]=exact?['sure',t('tagQr')]:['unsure',t('tagQrOther')]}
@@ -158,6 +172,7 @@ function openFromRead(qr,ocr,photoUrl,ocrText){
   if(ocr){for(const k of ['date','invNo','name','desc','vatNo','after','before','tax']){const val=ocr[k];if(val===null||val===undefined||val==='')continue;if(v[k]===''||v[k]===null){v[k]=val;flags[k]=['unsure',t('tagPhoto')]}}if(!qr&&v.after!==null){if(v.tax===null||v.before===null){v.rate=15}else v.rate=v.tax>0?15:0}}
   const mem=memoryFor(v.vatNo);
   if(mem){if(mem.name){v.name=mem.name;flags.name=['sure',t('tagSavedName')]}if(!v.desc&&mem.desc){v.desc=mem.desc;flags.desc=['unsure',t('tagLast')]}}
+  autoName=flags.name&&flags.name[0]==='unsure'?v.name:'';
   formSource=qr?'qr':(ocr?'photo':'manual');
   touched.clear();qrTime=qr?.kind==='zatca'?(qr.rawDate||''):'';
   const token=openForm(null,v);
@@ -171,6 +186,7 @@ function openFromRead(qr,ocr,photoUrl,ocrText){
   else if(qr)status(t('stQr'),'ok');
   else if(ocr)status(t('stOcr'),'warn');
   else status(t('stNone'),'bad');
+  if(mm){const msg=t(exactText?'mismatchUsedPrinted':'mismatch',{q:money(mm.qr),p:money(mm.printed)});status(msg+' '+$('fStatus').textContent,'warn');for(const k of ['after','before','tax'])setFlag(k,'unsure',t('tagCheck'))}
   return token;
 }
 // After a live QR scan: the QR never contains the invoice number, so read it from the picture in the background.
@@ -181,7 +197,7 @@ async function fillFromPicture(token,canvas){
     if(token!==formToken)return; // the form was closed or another invoice was opened
     if(text){$('fOcr').textContent=text;show('fOcrWrap')}
     // Fill every field that is still empty and that the user has not typed in.
-    for(const k of ['invNo','desc','name','vatNo','date']){const val=ocr[k];if(!val||touched.has(k)||$(F[k]).value.trim())continue;$(F[k]).value=val;setFlag(k,'unsure',t('tagPhoto'))}
+    for(const k of ['invNo','desc','name','vatNo','date']){const val=ocr[k];if(!val||touched.has(k)||$(F[k]).value.trim())continue;$(F[k]).value=val;setFlag(k,'unsure',t('tagPhoto'));if(k==='name')autoName=val}
     if(ocr.after!==null&&!touched.has('after')&&!$('fAfter').value.trim()){
       $('fAfter').value=money(ocr.after);setFlag('after','unsure',t('tagPhoto'));
       if(ocr.tax!==null&&ocr.before!==null){$('fRate').value=ocr.tax>0?'15':'0';$('fTax').value=money(ocr.tax);$('fBefore').value=money(ocr.before);setFlag('tax','unsure',t('tagPhoto'));setFlag('before','unsure',t('tagPhoto'));checkSum()}else recalc('after')}
@@ -193,14 +209,32 @@ async function fillFromPicture(token,canvas){
 $('manualBtn').addEventListener('click',()=>{formSource='manual';qrTime='';touched.clear();openForm(null)});
 
 // ---------- photo reading ----------
+// Several photos or a PDF with several pages: read them all, then show them one after another.
+let readQueue=[],queueTotal=0;
+function openNextRead(){
+  const r=readQueue.shift();if(!r)return false;
+  openFromRead(r.qr,r.ocr,r.url,r.text,r.exact);
+  if(queueTotal>1){const s=$('fStatus');s.textContent=t('pageOf',{n:queueTotal-readQueue.length,m:queueTotal})+' · '+s.textContent}
+  return true;
+}
 $('photoBtn').addEventListener('click',()=>{$('photoInput').value='';$('photoInput').click()});
 $('photoInput').addEventListener('change',async()=>{
-  const file=$('photoInput').files[0];if(!file)return;
-  busy(t('reading'));
+  const files=[...$('photoInput').files];if(!files.length)return;
+  busy(t('reading'));const results=[];
   try{
-    const res=await Scan.readPhoto(file,p=>busy(t('readingPct',{p})));
-    let url='';try{const img=await Scan.imageFromFile(file);url=Scan.canvasFromImage(img,1400).toDataURL('image/jpeg',.8)}catch(e){}
-    busy(false);openFromRead(res.qr,res.ocr,url,res.text);
+    for(let i=0;i<files.length;i++){const file=files[i],tag=files.length>1?` (${i+1}/${files.length})`:'';
+      if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){
+        const pages=await Scan.readPdf(file,(n,m)=>busy(t('readingPage',{n,m})+tag));
+        // A digital PDF has exact printed text, so its amounts are trusted over a QR with rounding errors.
+        for(const p of pages)results.push(Object.assign(p,{exact:p.digital}));
+      }else{
+        const res=await Scan.readPhoto(file,p=>busy(t('readingPct',{p})+tag));
+        let url='';try{const img=await Scan.imageFromFile(file);url=Scan.canvasFromImage(img,1400).toDataURL('image/jpeg',.8)}catch(e){}
+        results.push({qr:res.qr,ocr:res.ocr,text:res.text,url});
+      }
+    }
+    busy(false);readQueue=results;queueTotal=results.length;
+    if(!openNextRead()){alert(t('photoFail'));openForm(null)}
   }catch(e){console.error(e);busy(false);alert(t('photoFail'));openForm(null)}
 });
 
@@ -230,11 +264,12 @@ async function startScanner(){
       if(!stream)return;
       if(!scanBusy&&now-lastAt>250){scanBusy=true;lastAt=now;frames++;
         try{
-          const c=frameCanvas(true,1100);let raw='';
-          if(c){raw=await Scan.tryDecode(c);
-            if(!raw&&frames%3===0)raw=await Scan.tryDecode(Scan.enhanceCanvas(c,'contrast'));
-            if(!raw&&frames%4===0)raw=await Scan.zxingWasmDecode(Scan.fixedThresholdCanvas(c,frames%8===0?190:170));
-            if(!raw&&frames%5===0){const full=frameCanvas(false,1400);if(full)raw=await Scan.tryDecode(full)}}
+          // Dense Phase-2 receipt QR codes need the full camera resolution and the strong reader.
+          const c=frameCanvas(true,1600);let raw='';
+          if(c){raw=await Scan.zxingWasmDecode(c);
+            if(!raw&&frames%2===0)raw=await Scan.zxingWasmDecode(Scan.adaptiveCanvas(c,frames%4===0?21:31,8),{tryDownscale:false});
+            if(!raw&&frames%3===0)raw=await Scan.tryDecode(Scan.fitCanvas(c,1000));
+            if(!raw&&frames%5===0){const full=frameCanvas(false,2000);if(full)raw=await Scan.zxingWasmDecode(full)}}
           if(raw){const qr=Scan.qrFields(raw);
             if(qr&&raw!==lastRaw){lastRaw=raw;beep();try{navigator.vibrate&&navigator.vibrate([100,50,100])}catch(e){}
               const still=await captureStill();stopScanner();
