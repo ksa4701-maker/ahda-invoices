@@ -1,0 +1,18 @@
+OFFLINE OCR THIRD-PARTY NOTICES
+
+Tesseract.js 7.0.0
+Copyright contributors to the Tesseract.js project.
+Licensed under the Apache License 2.0.
+See LICENSE-tesseract-js.txt.
+
+tesseract.js-core 7.0.0
+Copyright contributors to the Tesseract.js and Tesseract OCR projects.
+Licensed under the Apache License 2.0.
+See LICENSE-tesseract-core.txt and LICENSE-tesseract-bundle.txt.
+
+English and Arabic trained data packages
+@tesseract.js-data/eng 1.0.0 and @tesseract.js-data/ara 1.0.0.
+Distributed by the Tesseract.js data project under its MIT package license.
+
+These components are bundled so full-invoice OCR works locally without a
+mobile internet connection.

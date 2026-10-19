@@ -1,0 +1,7 @@
+ZXING-C++ WEBASSEMBLY READER
+
+This folder contains zxing-wasm 3.1.2 reader assets, which wrap ZXing-C++ for
+WebAssembly use in the mobile invoice scanner.
+
+zxing-wasm is distributed under the MIT License. See
+LICENSE-zxing-wasm.txt in this folder.
